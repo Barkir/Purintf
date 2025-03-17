@@ -5,5 +5,10 @@ extern int purintf(const char * string, ...);
 
 int main(void)
 {
-    purintf("helloo %c %c %c", 'a', 'b', '3');
+    const char * line = "printing number...";
+    for (int i = 0; i < 100; i++)
+    {
+        purintf("%% i = %x %o %b %c %d", i, i, i, i, i);
+        printf("\n");
+    }
 }

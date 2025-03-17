@@ -1,11 +1,11 @@
 
 
 section .text
-        global _start
+        global purintf
 
-_start:
-        lea rsi, [strr]
-        call purintf
+; _start:
+;         lea rsi, [strr]
+;         call purintf
 
 
 purintf:
@@ -27,7 +27,7 @@ purintf:
 purintf_help:
 
         lea r13, [buf]
-        lea r12, [h]        ;mov r12, rdi    ;|      Getting
+        mov r12, rdi    ;|      Getting
         push rcx        ;|
         call linelen    ;|      Line Length
         pop rcx
@@ -39,7 +39,7 @@ purintf_help:
         inc r11         ;|      Args Counter
         inc r11         ;|
 
-        lea r12, [h]        ;mov r12, rdi
+        mov r12, rdi
 
 ; -----------------------------------
         purintf_cycle:
@@ -65,9 +65,6 @@ purintf_help:
         push rax
         pop rdx
         mov rax, 1
-        syscall
-
-        mov rax, 60
         syscall
 
 percents:
@@ -342,6 +339,8 @@ num2str:
         cmp r14, 16
         je sixteen
 
+        jmp copy_num2str
+
         two:
         mov byte [r13], '0'
         inc r13
@@ -416,7 +415,7 @@ _prcnt:
 ;/ / / /<data section>  / / / / / / /
 ;/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/
 
-buf times 32 db 0
+buf times 128 db 0
 num_buf times 64 db 0
 
 h db "12345656777 %s", 0
