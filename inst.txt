@@ -1,3 +1,0 @@
-nasm -f elf64 purintf.asm -o purintf.o
-
-gcc main.c purintf.o -o run
