@@ -1,11 +1,12 @@
 
 
 section .text
-        global purintf
+        global _start
 
-; _start:
-        ; mov rsi, 40
-        ; call purintf
+_start:
+        mov rsi, 40
+        lea rdx, [strr]
+        call purintf
 
 
 purintf:
@@ -27,7 +28,7 @@ purintf:
 purintf_help:
 
         lea r13, [buf]
-        lea r12, [h]               ;mov r12, rdi    ;|      Getting
+        lea r12, [h]        ;mov r12, rdi    ;|      Getting
         push rcx        ;|
         call linelen    ;|      Line Length
         pop rcx
@@ -41,7 +42,7 @@ purintf_help:
         inc r11         ;|      Args Counter
         inc r11         ;|
 
-        lea r12, [h]                ;mov r12, rdi
+        lea r12, [h]        ;mov r12, rdi
 
 ; -----------------------------------
         purintf_cycle:
@@ -187,6 +188,32 @@ _c:
         jmp purintf_cycle
 
 _s:
+        call getArg
+        push r12
+
+        mov r12, rax
+        push r12
+        call linelen
+        pop r12
+
+        push r11
+        mov r11, rax
+
+        xor rax, rax
+
+        string_loop:
+                mov al, [r12]
+                inc r12
+                cmp al, 0
+                je string_loop_end
+                mov [r13], al
+                inc r13
+                jmp string_loop
+
+        string_loop_end:
+        pop r11
+        pop r12
+
         jmp purintf_cycle
 
 _d:
@@ -201,5 +228,6 @@ _d:
 ;/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/
 
 buf times 128 db 0
-h db "hello %c", 0
+h db "hello %c %s\n", 0
+strr db "heeeey", 0
 BUFLEN equ 128
