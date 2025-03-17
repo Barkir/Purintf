@@ -4,8 +4,7 @@ section .text
         global _start
 
 _start:
-        mov rsi, 5
-        lea rdx, [strr]
+        lea rsi, [strr]
         call purintf
 
 
@@ -94,6 +93,9 @@ percents:
 
         cmp al, 'b'
         je _b
+
+        cmp al, '%'
+        je _prcnt
 
 ; ----------------------------------
 ; Entry:        Line address in r12
@@ -209,6 +211,11 @@ _s:
         push r11
         mov r11, rax
 
+        cmp r11, 128
+        ja _s_syscall
+        cmp r11, 64
+        ja _s_write_buf
+
         xor rax, rax
 
         string_loop:
@@ -226,58 +233,69 @@ _s:
 
         jmp purintf_cycle
 
-_d:
-        call getArg
-        push r11
-        lea r11, [num_buf]
-        inc r11
-        push rbx         ; Saving rbx
+_s_syscall:
+        push rsi
+        push rdx
+        push rdi
+        push rax
 
-        xor rbx, rbx
+        mov rdx, r11
+        mov rsi, r12
+        mov rdi, 1
+        mov rax, 1
+        syscall
 
-        mov bl, 10      ; Copying 10 to div
-
-        digit_loop:
-
-        push rdx        ; Saving rdx
-
-        xor rdx, rdx
-        div rbx         ; div
-        add dl, 0x30    ; adding 30 to mod
-
-
-        mov [r11], dl   ; copying to buf
-        inc r11         ; moving buf pointer
-
+        pop rax
+        pop rdi
         pop rdx
+        pop rsi
 
-        test rax, rax   ; checking if zero
-        jz digit_end    ;
+        jmp string_loop_end
 
-        jmp digit_loop
+_s_write_buf:
+        push rsi
+        push r12
+        push r11
+        push rax
+        push rdx
+        push rdi
+        push rcx
 
-        digit_end:
+        lea r12, [buf]
+        call linelen
 
-        dec r11
-        copy_digit:
-                push r10
-                mov r10, [r11]
-                mov byte [r11], 0
-                mov [r13], r10
-                pop r10
+        mov rdx, rax
+        lea rsi, [buf]
+        mov rdi, 1
+        mov rax, 1
+        syscall
 
-                inc r13
-                dec r11
-                cmp r11, num_buf
-                je copy_end
-                jmp copy_digit
+        mov rcx, rdx
+        mov al, 0
+        lea rdi, [buf]
+        rep stosb
 
-        copy_end:
-        pop rbx
+        pop rcx
+        pop rdi
+        pop rdx
+        pop rax
         pop r11
-        jmp purintf_cycle
+        pop r12
+        pop rsi
 
-_x:
+        jmp string_loop
+
+
+
+
+
+;--------------------------------
+; Entry: degree in r14
+; Exit:  number in buf
+; Destr: rax, rb
+;--------------------------------
+
+num2str:
         call getArg
         push r11
         lea r11, [num_buf]
@@ -290,9 +308,9 @@ _x:
         xor rbx, rbx
 
 
-        mov bl, 16
+        mov rbx, r14
 
-        x_loop:
+        num2str_loop:
 
         xor rdx, rdx
 
@@ -303,24 +321,46 @@ _x:
 
         add dl, 0x30    ; adding 30 to mod
 
-        buf_jmp:
+        num2str_jmp:
         mov [r11], dl   ; copying to buf
         inc r11         ; moving buf pointer
 
         test rax, rax   ; checking if zero
-        jz x_end    ;
+        jz num2str_end   ;
 
-        jmp x_loop
+        jmp num2str_loop
 
-        x_end:
-
+        num2str_end:
         dec r11
+
+        cmp r14, 2
+        je two
+
+        cmp r14, 8
+        je eight
+
+        cmp r14, 16
+        je sixteen
+
+        two:
+        mov byte [r13], '0'
+        inc r13
+        mov byte [r13], 'b'
+        inc r13
+        jmp copy_num2str
+
+        eight:
+        mov byte [r13], '0'
+        inc r13
+        jmp copy_num2str
+
+        sixteen:
         mov byte [r13], '0'
         inc r13
         mov byte [r13], 'x'
         inc r13
 
-        copy_x:
+        copy_num2str:
                 push r10
                 mov r10, [r11]
                 mov byte [r11], 0
@@ -330,124 +370,43 @@ _x:
                 inc r13
                 dec r11
                 cmp r11, num_buf
-                je copy_x_end
-                jmp copy_x
+                je copy_num2str_end
+                jmp copy_num2str
 
-        copy_x_end:
+        copy_num2str_end:
 
         pop rbx
         pop rdx
         pop r11
-        jmp purintf_cycle
+        ret
 
         alph:
-                add dl, 0x37
-                jmp buf_jmp
+        add dl, 0x37
+        jmp num2str_jmp
+
+_d:
+        mov r14, 10
+        call num2str
+        jmp purintf_cycle
+
+_x:
+        mov r14, 16
+        call num2str
+        jmp purintf_cycle
 
 _o:
-        call getArg
-        push r11
-        lea r11, [num_buf]
-        inc r11
-        push rbx         ; Saving rbx
-
-        xor rbx, rbx
-
-        mov bl, 8       ; Copying 8 to div
-
-        o_loop:
-
-        push rdx        ; Saving rdx
-
-        xor rdx, rdx
-        div rbx         ; div
-        add dl, 0x30    ; adding 30 to mod
-
-
-        mov [r11], dl   ; copying to buf
-        inc r11         ; moving buf pointer
-
-        pop rdx
-
-        test rax, rax   ; checking if zero
-        jz o_end        ;
-
-        jmp o_loop
-
-        o_end:
-
-        dec r11
-        copy_o:
-                push r10
-                mov r10, [r11]
-                mov byte [r11], 0
-                mov [r13], r10
-                pop r10
-
-                inc r13
-                dec r11
-                cmp r11, num_buf
-                je copy_o_end
-                jmp copy_o
-
-        copy_o_end:
-        pop rbx
-        pop r11
+        mov r14, 8
+        call num2str
         jmp purintf_cycle
 
 _b:
-        call getArg
-        push r11
-        lea r11, [num_buf]
-        inc r11
-        push rbx         ; Saving rbx
+        mov r14, 2
+        call num2str
+        jmp purintf_cycle
 
-        xor rbx, rbx
-
-        mov bl, 2       ; Copying 8 to div
-
-        b_loop:
-
-        push rdx        ; Saving rdx
-
-        xor rdx, rdx
-        div rbx         ; div
-        add dl, 0x30    ; adding 30 to mod
-
-
-        mov [r11], dl   ; copying to buf
-        inc r11         ; moving buf pointer
-
-        pop rdx
-
-        test rax, rax   ; checking if zero
-        jz b_end        ;
-
-        jmp b_loop
-
-        b_end:
-
-        dec r11
-        mov byte [r13], '0'
+_prcnt:
+        mov byte [r13], '%'
         inc r13
-        mov byte [r13], 'b'
-        inc r13
-        copy_b:
-                push r10
-                mov r10, [r11]
-                mov byte [r11], 0
-                mov [r13], r10
-                pop r10
-
-                inc r13
-                dec r11
-                cmp r11, num_buf
-                je copy_b_end
-                jmp copy_b
-
-        copy_b_end:
-        pop rbx
-        pop r11
         jmp purintf_cycle
 
         section .data
@@ -457,9 +416,9 @@ _b:
 ;/ / / /<data section>  / / / / / / /
 ;/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/
 
-buf times 128 db 0
+buf times 32 db 0
 num_buf times 64 db 0
 
-h db "%b %s \n \\\\", 0
-strr db "hello world", 0
+h db "12345656777 %s", 0
+strr db "hellloo\n", 0
 BUFLEN equ 128
