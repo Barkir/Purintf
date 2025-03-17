@@ -4,7 +4,7 @@ section .text
         global _start
 
 _start:
-        mov rsi, 40
+        mov rsi, 64
         lea rdx, [strr]
         call purintf
 
@@ -63,6 +63,9 @@ purintf_help:
 
         lea rsi, [buf]
         mov rdi, 1
+        lea r12, [buf]
+        call linelen
+        push rax
         pop rdx
         mov rax, 1
         syscall
@@ -84,6 +87,15 @@ percents:
 
         cmp al, 'd'
         je _d
+
+        cmp al, 'x'
+        je _x
+
+        cmp al, 'o'
+        je _o
+
+        cmp al, 'b'
+        je _b
 
 ; ----------------------------------
 ; Entry:        Line address in r12
@@ -217,17 +229,187 @@ _s:
         jmp purintf_cycle
 
 _d:
+        call getArg
+        push r11
+        lea r11, [num_buf]
+        inc r11
+        push rbx         ; Saving rbx
+
+        xor rbx, rbx
+
+        mov bl, 10      ; Copying 10 to div
+
+        digit_loop:
+
+        push rdx        ; Saving rdx
+
+        xor rdx, rdx
+        div rbx         ; div
+        add dl, 0x30    ; adding 30 to mod
+
+
+        mov [r11], dl   ; copying to buf
+        inc r11         ; moving buf pointer
+
+        pop rdx
+
+        test rax, rax   ; checking if zero
+        jz digit_end    ;
+
+        jmp digit_loop
+
+        digit_end:
+
+        dec r11
+        copy_digit:
+                push r10
+                mov r10, [r11]
+                mov byte [r11], 0
+                mov [r13], r10
+                pop r10
+
+                inc r13
+                dec r11
+                cmp r11, num_buf
+                je copy_end
+                jmp copy_digit
+
+        copy_end:
+        pop rbx
+        pop r11
         jmp purintf_cycle
 
+_x:
+        call getArg
+        push r11
+        lea r11, [num_buf]
+        inc r11
+
+        push rdx
+        push rbx
+
+        xor rdx, rdx
+        xor rbx, rbx
+
+
+        mov bl, 16
+
+        x_loop:
+
+        xor rdx, rdx
+
+        div rbx         ; div
+
+        cmp dl, 0x09
+        ja alph
+
+        add dl, 0x30    ; adding 30 to mod
+
+        buf_jmp:
+        mov [r11], dl   ; copying to buf
+        inc r11         ; moving buf pointer
+
+        test rax, rax   ; checking if zero
+        jz x_end    ;
+
+        jmp x_loop
+
+        x_end:
+
+        dec r11
+        mov byte [r13], '0'
+        inc r13
+        mov byte [r13], 'x'
+        inc r13
+
+        copy_x:
+                push r10
+                mov r10, [r11]
+                mov byte [r11], 0
+                mov [r13], r10
+                pop r10
+
+                inc r13
+                dec r11
+                cmp r11, num_buf
+                je copy_x_end
+                jmp copy_x
+
+        copy_x_end:
+
+        pop rbx
+        pop rdx
+        pop r11
+        jmp purintf_cycle
+
+        alph:
+                add dl, 0x37
+                jmp buf_jmp
+
+_o:
+        call getArg
+        push r11
+        lea r11, [num_buf]
+        inc r11
+        push rbx         ; Saving rbx
+
+        xor rbx, rbx
+
+        mov bl, 8       ; Copying 8 to div
+
+        o_loop:
+
+        push rdx        ; Saving rdx
+
+        xor rdx, rdx
+        div rbx         ; div
+        add dl, 0x30    ; adding 30 to mod
+
+
+        mov [r11], dl   ; copying to buf
+        inc r11         ; moving buf pointer
+
+        pop rdx
+
+        test rax, rax   ; checking if zero
+        jz o_end        ;
+
+        jmp o_loop
+
+        o_end:
+
+        dec r11
+        copy_o:
+                push r10
+                mov r10, [r11]
+                mov byte [r11], 0
+                mov [r13], r10
+                pop r10
+
+                inc r13
+                dec r11
+                cmp r11, num_buf
+                je copy_end
+                jmp copy_digit
+
+        copy_o_end:
+        pop rbx
+        pop r11
+        jmp purintf_cycle
+
+_b:
+        jmp purintf_cycle
 
         section .data
 
 
 ;/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/
-;/ / / / <data section>  / / / / / / /
+;/ / / /<data section>  / / / / / / /
 ;/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/
 
 buf times 128 db 0
-h db "hello %c %s\n", 0
-strr db "heeeey", 0
+num_buf times 64 db 0
+
+h db "%o %s \n \\\\", 0
+strr db "hello world", 0
 BUFLEN equ 128
