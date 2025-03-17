@@ -1,11 +1,11 @@
 
 
 section .text
-        global purintf
+        global _start
 
-; _start:
-;         lea rsi, [strr]
-;         call purintf
+_start:
+        lea rsi, [strr]
+        call purintf
 
 
 purintf:
@@ -15,7 +15,9 @@ purintf:
         push rdx
         push rsi
         push rdi
+
         call purintf_help
+
         pop rdi
         pop rsi
         pop rdx
@@ -27,7 +29,7 @@ purintf:
 purintf_help:
 
         lea r13, [buf]
-        mov r12, rdi    ;|      Getting
+        lea r12, [h]                ;mov r12, rdi    ;|      Getting
         push rcx        ;|
         call linelen    ;|      Line Length
         pop rcx
@@ -39,7 +41,7 @@ purintf_help:
         inc r11         ;|      Args Counter
         inc r11         ;|
 
-        mov r12, rdi
+        lea r12, [h]                ;mov r12, rdi
 
 ; -----------------------------------
         purintf_cycle:
@@ -52,6 +54,7 @@ purintf_help:
                 cmp al, '%'    ; Going to % jmp table
                 je percents
 
+                _default:
                 mov [r13], al  ; Copying a byte if it is not starting with percent
                 inc r13
                 jmp purintf_cycle
@@ -73,26 +76,32 @@ percents:
         inc r12
         dec r10
 
-        cmp al, 'c'
-        je _c
-
-        cmp al, 's'
-        je _s
-
-        cmp al, 'd'
-        je _d
-
-        cmp al, 'x'
-        je _x
-
-        cmp al, 'o'
-        je _o
-
-        cmp al, 'b'
-        je _b
+        push rax
 
         cmp al, '%'
         je _prcnt
+
+        sub rax, 'b'
+        shl rax, 3
+
+        add rax, jmp_table
+
+        jmp [rax]
+
+section .rodata
+
+jmp_table:
+        dq _b
+        dq _c
+        dq _d
+        dq 'o' - 'd'- 1  dup _default
+        dq _o
+        dq 's' - 'o' - 1 dup  _default
+        dq _s
+        dq 'x' - 's' - 1 dup _default
+        dq _x
+
+section .text
 
 ; ----------------------------------
 ; Entry:        Line address in r12
@@ -191,12 +200,14 @@ getArg:                         ;|
 ; -------------------------------|
 
 _c:
+        pop rax
         call getArg
         mov [r13], al
         inc r13
         jmp purintf_cycle
 
 _s:
+        pop rax
         call getArg
         push r12
 
@@ -323,7 +334,7 @@ num2str:
         inc r11         ; moving buf pointer
 
         test rax, rax   ; checking if zero
-        jz num2str_end   ;
+        jz num2str_end  ;
 
         jmp num2str_loop
 
@@ -384,26 +395,31 @@ num2str:
         jmp num2str_jmp
 
 _d:
+        pop rax
         mov r14, 10
         call num2str
         jmp purintf_cycle
 
 _x:
+        pop rax
         mov r14, 16
         call num2str
         jmp purintf_cycle
 
 _o:
+        pop rax
         mov r14, 8
         call num2str
         jmp purintf_cycle
 
 _b:
+        pop rax
         mov r14, 2
         call num2str
         jmp purintf_cycle
 
 _prcnt:
+        pop rax
         mov byte [r13], '%'
         inc r13
         jmp purintf_cycle
@@ -415,9 +431,11 @@ _prcnt:
 ;/ / / /<data section>  / / / / / / /
 ;/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/
 
+section .data
+
 buf times 128 db 0
 num_buf times 64 db 0
 
-h db "12345656777 %s", 0
+h db "1 %s", 0
 strr db "hellloo\n", 0
 BUFLEN equ 128
