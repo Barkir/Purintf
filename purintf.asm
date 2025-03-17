@@ -4,7 +4,7 @@ section .text
         global _start
 
 _start:
-        mov rsi, 64
+        mov rsi, 5
         lea rdx, [strr]
         call purintf
 
@@ -32,8 +32,6 @@ purintf_help:
         push rcx        ;|
         call linelen    ;|      Line Length
         pop rcx
-
-        push rax        ;|      Pushing line length
 
         mov r10, rax    ;|      Saving It
         xor rax, rax    ;|
@@ -389,8 +387,8 @@ _o:
                 inc r13
                 dec r11
                 cmp r11, num_buf
-                je copy_end
-                jmp copy_digit
+                je copy_o_end
+                jmp copy_o
 
         copy_o_end:
         pop rbx
@@ -398,6 +396,58 @@ _o:
         jmp purintf_cycle
 
 _b:
+        call getArg
+        push r11
+        lea r11, [num_buf]
+        inc r11
+        push rbx         ; Saving rbx
+
+        xor rbx, rbx
+
+        mov bl, 2       ; Copying 8 to div
+
+        b_loop:
+
+        push rdx        ; Saving rdx
+
+        xor rdx, rdx
+        div rbx         ; div
+        add dl, 0x30    ; adding 30 to mod
+
+
+        mov [r11], dl   ; copying to buf
+        inc r11         ; moving buf pointer
+
+        pop rdx
+
+        test rax, rax   ; checking if zero
+        jz b_end        ;
+
+        jmp b_loop
+
+        b_end:
+
+        dec r11
+        mov byte [r13], '0'
+        inc r13
+        mov byte [r13], 'b'
+        inc r13
+        copy_b:
+                push r10
+                mov r10, [r11]
+                mov byte [r11], 0
+                mov [r13], r10
+                pop r10
+
+                inc r13
+                dec r11
+                cmp r11, num_buf
+                je copy_b_end
+                jmp copy_b
+
+        copy_b_end:
+        pop rbx
+        pop r11
         jmp purintf_cycle
 
         section .data
@@ -410,6 +460,6 @@ _b:
 buf times 128 db 0
 num_buf times 64 db 0
 
-h db "%o %s \n \\\\", 0
+h db "%b %s \n \\\\", 0
 strr db "hello world", 0
 BUFLEN equ 128
