@@ -1,14 +1,19 @@
 
 
 section .text
-        global _start
+        global purintf
 
-_start:
-        lea rsi, [strr]
-        call purintf
+; _start:
+;         lea rsi, [strr]
+;         call purintf
 
 
 purintf:
+
+        pop rax
+        pop rbx
+        pop r15
+
         push r9
         push r8
         push rcx
@@ -16,20 +21,17 @@ purintf:
         push rsi
         push rdi
 
-        call purintf_help
+        mov rbp, rsp
+        add rbp, 8
 
-        pop rdi
-        pop rsi
-        pop rdx
-        pop rcx
-        pop r8
-        pop r9
-        ret
+        push r15
+        push rbx
+        push rax
 
 purintf_help:
 
         lea r13, [buf]
-        lea r12, [h]                ;mov r12, rdi    ;|      Getting
+        mov r12, rdi    ;|      Getting
         push rcx        ;|
         call linelen    ;|      Line Length
         pop rcx
@@ -41,7 +43,7 @@ purintf_help:
         inc r11         ;|      Args Counter
         inc r11         ;|
 
-        lea r12, [h]                ;mov r12, rdi
+        mov r12, rdi
 
 ; -----------------------------------
         purintf_cycle:
@@ -68,7 +70,10 @@ purintf_help:
         push rax
         pop rdx
         mov rax, 1
+
         syscall
+
+        ret
 
 percents:
 
@@ -123,92 +128,24 @@ linelen:
         inc rax
         ret
 
-; -------------------------------|
-
-;               <1>
-
-frsArg:                         ;|
-        push rdi                ;|
-        pop rax                 ;|
-        jmp getArg_end          ;|
-                                ;|
-;               <2>
-
-scnArg:                         ;|
-        push rsi                ;|
-        pop rax                 ;|
-        jmp getArg_end          ;|
-                                ;|
-
-;               <3>
-
-thrArg:                         ;|
-        push rdx                ;|
-        pop rax                 ;|
-        jmp getArg_end          ;|
-                                ;|
-
-;               <4>
-
-frtArg:                         ;|
-        push rcx                ;|
-        pop rax                 ;|
-        jmp getArg_end          ;|
-                                ;|
-
-;               <5>
-
-fthArg:                         ;|
-        push r8                 ;|
-        pop rax                 ;|
-        jmp getArg_end          ;|
-                                ;|
-
-;               <6>
-
-sxtArg:                         ;|
-        push r9                 ;|
-        pop rax                 ;|
-        jmp getArg_end          ;|
-                                ;|
-
-;---------Getting Arg------------|
-
-getArg:                         ;|
-        cmp r11, 1              ;|
-        je frsArg               ;|
-                                ;|
-        cmp r11, 2              ;|
-        je scnArg               ;|
-                                ;|
-        cmp r11, 3              ;|
-        je thrArg               ;|
-                                ;|
-        cmp r11, 4              ;|
-        je frtArg               ;|
-                                ;|
-        cmp r11, 5              ;|
-        je fthArg               ;|
-                                ;|
-        cmp r11, 6              ;|
-        je sxtArg               ;|
-                                ;|
-                                ;|
-        getArg_end:             ;|
-        inc r11
-        ret                     ;|
-; -------------------------------|
-
 _c:
         pop rax
-        call getArg
+
+        mov rax, [rbp]
+        add rbp, 8
+        inc r11
+
         mov [r13], al
         inc r13
         jmp purintf_cycle
 
 _s:
         pop rax
-        call getArg
+
+        mov rax, [rbp]
+        add rbp, 8
+        inc r11
+
         push r12
 
         mov r12, rax
@@ -295,7 +232,7 @@ _s_write_buf:
 
 
 
-
+; Function for turning number to string
 
 ;--------------------------------
 ; Entry: degree in r14
@@ -304,7 +241,7 @@ _s_write_buf:
 ;--------------------------------
 
 num2str:
-        call getArg
+
         push r11
         lea r11, [num_buf]
         inc r11
@@ -396,18 +333,33 @@ num2str:
 
 _d:
         pop rax
+
+        mov rax, [rbp]
+        add rbp, 8
+        inc r11
+
         mov r14, 10
         call num2str
         jmp purintf_cycle
 
 _x:
         pop rax
+
+        mov rax, [rbp]
+        add rbp, 8
+        inc r11
+
         mov r14, 16
         call num2str
         jmp purintf_cycle
 
 _o:
         pop rax
+
+        mov rax, [rbp]
+        add rbp, 8
+        inc r11
+
         mov r14, 8
         call num2str
         jmp purintf_cycle
