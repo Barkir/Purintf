@@ -3,39 +3,37 @@
 section .text
         global purintf
 
-; _start:
-;         lea rsi, [strr]
-;         call purintf
+; ----------------------------------|
+;       PURINTF START               |
+; ----------------------------------|
+purintf:                           ;|
+                                   ;|
+        pop rax                    ;|
+                                   ;|
+        push r9                    ;|
+        push r8                    ;|
+        push rcx                   ;|
+        push rdx                   ;|
+        push rsi                   ;|
+        push rdi                   ;|
+                                   ;|
+        mov r15, rbp               ;|
+                                   ;|
+        mov rbp, rsp               ;|
+        add rbp, 8                 ;|
+                                   ;|
+        push rax                   ;|
+;-----------------------------------|
 
-
-purintf:
-
-        pop rax
-        pop rbx
-        pop r15
-
-        push r9
-        push r8
-        push rcx
-        push rdx
-        push rsi
-        push rdi
-
-        mov rbp, rsp
-        add rbp, 8
-
-        push r15
-        push rbx
-        push rax
 
 purintf_help:
 
-        lea r13, [buf]
+        lea r13, [buf]  ;|
         mov r12, rdi    ;|      Getting
         push rcx        ;|
         call linelen    ;|      Line Length
         pop rcx
-
+                        ;|
         mov r10, rax    ;|      Saving It
         xor rax, rax    ;|
 
@@ -70,10 +68,12 @@ purintf_help:
         push rax
         pop rdx
         mov rax, 1
-
         syscall
 
+        mov rbp, r15
+
         ret
+
 
 percents:
 
@@ -95,19 +95,24 @@ percents:
 
 section .rodata
 
-jmp_table:
-        dq _b
-        dq _c
-        dq _d
-        dq 'o' - 'd'- 1  dup _default
-        dq _o
-        dq 's' - 'o' - 1 dup  _default
-        dq _s
-        dq 'x' - 's' - 1 dup _default
-        dq _x
+;               jump table
+;-------------------------------------- ;|
+jmp_table:                              ;|
+        dq _b                           ;|
+        dq _c                           ;|
+        dq _d                           ;|
+        dq 'o' - 'd'- 1  dup _default   ;|
+        dq _o                           ;|
+        dq 's' - 'o' - 1 dup  _default  ;|
+        dq _s                           ;|
+        dq 'x' - 's' - 1 dup _default   ;|
+        dq _x                           ;|
+;----------------------------------------|
 
 section .text
 
+
+;       Counting Line Length
 ; ----------------------------------
 ; Entry:        Line address in r12
 ; Return:       Line length in ax
@@ -128,116 +133,208 @@ linelen:
         inc rax
         ret
 
+
+;       %c label
 _c:
-        pop rax
+        pop rax                         ;|
+                                        ;|
+        mov rax, [rbp]                  ;|
+        add rbp, 8                      ;|
+        inc r11                         ;|
+                                        ;|
+        mov [r13], al                   ;|
+        inc r13                         ;|
+        jmp purintf_cycle               ;|
+                                        ;|
 
-        mov rax, [rbp]
-        add rbp, 8
-        inc r11
-
-        mov [r13], al
-        inc r13
-        jmp purintf_cycle
-
+;       %s label
 _s:
-        pop rax
+        pop rax                         ;|
+                                        ;|
+        mov rax, [rbp]                  ;|
+        add rbp, 8                      ;|
+        inc r11                         ;|
+                                        ;|
+        push r12                        ;|
+                                        ;|
+        mov r12, rax                    ;|
+        push r12                        ;|
+        call linelen                    ;|
+        pop r12                         ;|
+                                        ;|
+        push r11                        ;|
+        mov r11, rax                    ;|
+                                        ;|
+        cmp r11, 128                    ;|
+        ja _s_syscall                   ;|
+        cmp r11, 64                     ;|
+        ja _s_write_buf                 ;|
+                                        ;|
+        xor rax, rax                    ;|
 
-        mov rax, [rbp]
-        add rbp, 8
+        string_loop:                    ;|
+                mov al, [r12]           ;|
+                inc r12                 ;|
+                cmp al, 0               ;|
+                je string_loop_end      ;|
+                mov [r13], al           ;|
+                inc r13                 ;|
+                jmp string_loop         ;|
+                                        ;|
+        string_loop_end:                ;|
+        pop r11                         ;|
+        pop r12                         ;|
+                                        ;|
+        jmp purintf_cycle               ;|
+
+_s_syscall:                             ;|
+        push rsi                        ;|
+        push rdx                        ;|
+        push rdi                        ;|
+        push rax                        ;|
+
+        mov rdx, r11                    ;|
+        mov rsi, r12                    ;|
+        mov rdi, 1                      ;|
+        mov rax, 1                      ;|
+        syscall                         ;|
+
+        pop rax                         ;|
+        pop rdi                         ;|
+        pop rdx                         ;|
+        pop rsi                         ;|
+                                        ;|
+        jmp string_loop_end             ;|
+
+_s_write_buf:                           ;|
+        push rsi                        ;|
+        push r12                        ;|
+        push r11                        ;|
+        push rax                        ;|
+        push rdx                        ;|
+        push rdi                        ;|
+        push rcx                        ;|
+
+        lea r12, [buf]                  ;|
+        call linelen                    ;|
+
+        mov rdx, rax                    ;|
+        lea rsi, [buf]                  ;|
+        mov rdi, 1                      ;|
+        mov rax, 1                      ;|
+        syscall                         ;|
+
+        mov rcx, rdx                    ;|
+        mov al, 0                       ;|
+        lea rdi, [buf]                  ;|
+        rep stosb                       ;|
+
+        pop rcx                         ;|
+        pop rdi                         ;|
+        pop rdx                         ;|
+        pop rax                         ;|
+        pop r11                         ;|
+        pop r12                         ;|
+        pop rsi                         ;|
+
+        jmp string_loop                 ;|
+
+
+
+; Function for turning dec number to string
+
+;--------------------------------
+; Entry:
+; Exit:  dec number in buf
+; Destr: rax, rbx, rdx
+;--------------------------------
+
+decnum2str:
+
+        push r11
+        lea r11, [num_buf]
         inc r11
 
-        push r12
-
-        mov r12, rax
-        push r12
-        call linelen
-        pop r12
-
-        push r11
-        mov r11, rax
-
-        cmp r11, 128
-        ja _s_syscall
-        cmp r11, 64
-        ja _s_write_buf
-
-        xor rax, rax
-
-        string_loop:
-                mov al, [r12]
-                inc r12
-                cmp al, 0
-                je string_loop_end
-                mov [r13], al
-                inc r13
-                jmp string_loop
-
-        string_loop_end:
-        pop r11
-        pop r12
-
-        jmp purintf_cycle
-
-_s_syscall:
-        push rsi
         push rdx
-        push rdi
+        push rbx
+        xor rbx, rbx
+
         push rax
 
-        mov rdx, r11
-        mov rsi, r12
-        mov rdi, 1
-        mov rax, 1
-        syscall
-
-        pop rax
-        pop rdi
-        pop rdx
-        pop rsi
-
-        jmp string_loop_end
-
-_s_write_buf:
-        push rsi
-        push r12
-        push r11
-        push rax
-        push rdx
-        push rdi
         push rcx
 
-        lea r12, [buf]
-        call linelen
-
-        mov rdx, rax
-        lea rsi, [buf]
-        mov rdi, 1
-        mov rax, 1
-        syscall
-
-        mov rcx, rdx
-        mov al, 0
-        lea rdi, [buf]
-        rep stosb
-
+        mov rcx, rax
+        and ecx, 0x80000000
+        cmp ecx, 0
+        jne neg_ecx
         pop rcx
-        pop rdi
-        pop rdx
+
+        neg_ecx_cont:
+        mov rbx, 10
+
+        decnum2str_loop:
+
+        xor rdx, rdx
+
+        div rbx
+
+        cmp dl, 0x09
+
+        add dl, 0x30            ; adding 30 to mod
+
+        mov [r11], dl           ; copying to buf
+        inc r11                 ; moving buf pointer
+
+        test rax, rax           ; checking if zero
+        jz decnum2str_end
+
+        jmp decnum2str_loop
+
+
+        decnum2str_end:
+        dec r11
+
         pop rax
+
+        deccopy_num2str:
+                push r10
+                mov r10, [r11]
+                mov byte [r11], 0
+                mov [r13], r10
+                pop r10
+
+                inc r13
+                dec r11
+                cmp r11, num_buf
+                je deccopy_num2str_end
+                jmp deccopy_num2str
+
+        deccopy_num2str_end:
+
+        pop rbx
+        pop rdx
         pop r11
-        pop r12
-        pop rsi
+        ret
 
-        jmp string_loop
+neg_ecx:
+        pop rcx
+        mov byte [r13], '-'
+        inc r13
 
+        neg eax
 
+        pop rbx
 
-; Function for turning number to string
+        push rax
+
+        jmp neg_ecx_cont
+
+; Function for turning dec number to string
 
 ;--------------------------------
 ; Entry: degree in r14
-; Exit:  number in buf
-; Destr: rax, rb
+; Exit:  dec number in buf
+; Destr: rax, rbx, rdx
 ;--------------------------------
 
 num2str:
@@ -254,13 +351,40 @@ num2str:
 
 
         mov rbx, r14
+        sub rbx, 1
 
         num2str_loop:
 
         xor rdx, rdx
 
-        div rbx         ; div
+        push rax
 
+        and rax, rbx    ;|      Mod by rbx
+        mov rdx, rax    ;|      moving it to rdx
+
+        pop rax
+
+        cmp r14, 2      ;|
+        je shr_1        ;|
+        cmp r14, 8      ;|
+        je shr_3        ;|      Dividing part
+        cmp r14, 16     ;|
+        je shr_4        ;|
+
+;<><><><><><><><><><><><><><><> <>
+        shr_1:          ;>>>    <>
+        shr rax, 1      ;>>>    <>
+        jmp mod2text    ;>>>    <>
+
+        shr_3:          ;>>>    <>
+        shr rax, 3      ;>>>    <>
+        jmp mod2text    ;>>>    <>
+
+        shr_4:          ;>>>    <>
+        shr rax, 4      ;>>>    <>
+;<><><><><><><><><><><><><><><> <>
+
+        mod2text:
         cmp dl, 0x09
         ja alph
 
@@ -338,8 +462,7 @@ _d:
         add rbp, 8
         inc r11
 
-        mov r14, 10
-        call num2str
+        call decnum2str
         jmp purintf_cycle
 
 _x:
@@ -366,12 +489,18 @@ _o:
 
 _b:
         pop rax
+
+        mov rax, [rbp]
+        add rbp, 8
+        inc r11
+
         mov r14, 2
         call num2str
         jmp purintf_cycle
 
 _prcnt:
         pop rax
+
         mov byte [r13], '%'
         inc r13
         jmp purintf_cycle
