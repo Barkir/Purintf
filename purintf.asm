@@ -86,12 +86,15 @@ percents:
         cmp al, '%'
         je _prcnt
 
-        sub rax, 'b'
-        shl rax, 3
+        cmp rax, 'b'
+        jb _default
 
-        add rax, jmp_table
+        cmp rax, 'x'
+        ja _default
 
-        jmp [rax]
+        jmp [(rax - 'b') * 8 + jmp_table]
+
+
 
 section .rodata
 
@@ -101,7 +104,9 @@ jmp_table:                              ;|
         dq _b                           ;|
         dq _c                           ;|
         dq _d                           ;|
-        dq 'o' - 'd'- 1  dup _default   ;|
+        dq _default                     ;|
+        dq _f                           ;|
+        dq 'o' - 'f'- 1  dup _default   ;|
         dq _o                           ;|
         dq 's' - 'o' - 1 dup  _default  ;|
         dq _s                           ;|
@@ -244,7 +249,7 @@ _s_write_buf:                           ;|
 ; Function for turning dec number to string
 
 ;--------------------------------
-; Entry:
+; Entry: number in rax
 ; Exit:  dec number in buf
 ; Destr: rax, rbx, rdx
 ;--------------------------------
@@ -332,10 +337,11 @@ neg_ecx:
 ; Function for turning dec number to string
 
 ;--------------------------------
-; Entry: degree in r14
+; Entry: degree in r14, mask in rbx
 ; Exit:  dec number in buf
 ; Destr: rax, rbx, rdx
 ;--------------------------------
+
 
 num2str:
 
@@ -343,19 +349,7 @@ num2str:
         lea r11, [num_buf]
         inc r11
 
-        push rdx
-        push rbx
-
-        xor rdx, rdx
-        xor rbx, rbx
-
-
-        mov rbx, r14
-        sub rbx, 1
-
         num2str_loop:
-
-        xor rdx, rdx
 
         push rax
 
@@ -364,31 +358,15 @@ num2str:
 
         pop rax
 
-        cmp r14, 2      ;|
-        je shr_1        ;|
-        cmp r14, 8      ;|
-        je shr_3        ;|      Dividing part
-        cmp r14, 16     ;|
-        je shr_4        ;|
-
-;<><><><><><><><><><><><><><><> <>
-        shr_1:          ;>>>    <>
-        shr rax, 1      ;>>>    <>
-        jmp mod2text    ;>>>    <>
-
-        shr_3:          ;>>>    <>
-        shr rax, 3      ;>>>    <>
-        jmp mod2text    ;>>>    <>
-
-        shr_4:          ;>>>    <>
-        shr rax, 4      ;>>>    <>
-;<><><><><><><><><><><><><><><> <>
+        shr rax, cl
 
         mod2text:
-        cmp dl, 0x09
-        ja alph
 
-        add dl, 0x30    ; adding 30 to mod
+        push r11
+        lea r11, [alphabet]
+        add r11, rdx
+        mov dl, [r11]
+        pop r11
 
         num2str_jmp:
         mov [r11], dl   ; copying to buf
@@ -402,34 +380,38 @@ num2str:
         num2str_end:
         dec r11
 
-        cmp r14, 2
-        je two
-
-        cmp r14, 8
-        je eight
-
-        cmp r14, 16
-        je sixteen
+;         cmp cl, 1
+;         je two
+;
+;         cmp cl, 3
+;         je eight
+;
+;         cmp cl, 4
+;         je sixteen
 
         jmp copy_num2str
 
-        two:
-        mov byte [r13], '0'
+        mov word [r13], [rsi]
         inc r13
-        mov byte [r13], 'b'
         inc r13
-        jmp copy_num2str
 
-        eight:
-        mov byte [r13], '0'
-        inc r13
-        jmp copy_num2str
-
-        sixteen:
-        mov byte [r13], '0'
-        inc r13
-        mov byte [r13], 'x'
-        inc r13
+;         two:
+;         mov byte [r13], '0'
+;         inc r13
+;         mov byte [r13], 'b'
+;         inc r13
+;         jmp copy_num2str
+;
+;         eight:
+;         mov byte [r13], '0'
+;         inc r13
+;         jmp copy_num2str
+;
+;         sixteen:
+;         mov byte [r13], '0'
+;         inc r13
+;         mov byte [r13], 'x'
+;         inc r13
 
         copy_num2str:
                 push r10
@@ -446,14 +428,96 @@ num2str:
 
         copy_num2str_end:
 
-        pop rbx
-        pop rdx
+
         pop r11
         ret
 
         alph:
         add dl, 0x37
         jmp num2str_jmp
+
+
+; Function for turning float number to string
+
+;--------------------------------
+; Entry: degree in r14
+; Exit:  dec number in buf
+; Destr: rax, rbx, rdx
+;--------------------------------
+
+float2str:
+
+        push r11
+        lea r11, [num_buf]
+        inc r11
+
+        push rax
+        push rbx
+        push rcx
+
+        mov ebx, eax
+
+        and ebx, 0x80000000
+
+        cmp ebx, 0
+        jne no_neg_float
+
+        mov byte [r13], '-'
+        inc r13
+
+        no_neg_float:
+
+
+        mov ecx, eax
+        and ecx, 0x007fffff
+
+        mov eax, ecx
+
+        mov rbx, 10
+
+        float2str_loop:
+
+        xor rdx, rdx
+
+        div rbx
+
+        add dl, 0x30            ; adding 30 to mod
+
+        mov [r11], dl           ; copying to buf
+        inc r11                 ; moving buf pointer
+
+        test rax, rax           ; checking if zero
+        jz float2str_end
+
+        jmp float2str_loop
+
+
+        float2str_end:
+        dec r11
+
+        copy_float2str:
+                push r10
+                mov r10, [r11]
+                mov byte [r11], 0
+                mov [r13], r10
+                pop r10
+
+                inc r13
+                dec r11
+                cmp r11, num_buf
+                je copy_float2str_end
+                jmp copy_float2str
+
+        copy_float2str_end:
+
+        pop rcx
+        pop rbx
+        pop rax
+        pop r11
+
+        ret
+
+
 
 _d:
         pop rax
@@ -472,8 +536,14 @@ _x:
         add rbp, 8
         inc r11
 
-        mov r14, 16
+
+        push rcx
+        mov cl,  4
+        mov rbx, 15
+
         call num2str
+        pop rcx
+
         jmp purintf_cycle
 
 _o:
@@ -483,8 +553,12 @@ _o:
         add rbp, 8
         inc r11
 
-        mov r14, 8
+        push rcx
+        mov cl,  3
+        mov rbx, 7
         call num2str
+        pop rcx
+
         jmp purintf_cycle
 
 _b:
@@ -494,8 +568,27 @@ _b:
         add rbp, 8
         inc r11
 
-        mov r14, 2
+
+        push rcx
+        mov cl,  1
+        mov rbx, 1
+
+        mov rsi, str_b
+
         call num2str
+        pop rcx
+
+        jmp purintf_cycle
+
+_f:
+        pop rax
+
+        mov rax, [rbp]
+        add rbp, 8
+        inc r11
+
+        mov r14, 10
+        call float2str
         jmp purintf_cycle
 
 _prcnt:
@@ -514,7 +607,16 @@ _prcnt:
 
 section .data
 
-buf times 128 db 0
+; 64 green zone addition
+buf times 128 + 64 db 0
+
+alphabet db "0123456789ABCDEF"
+
+str_b db '0b'
+str_x db '0x'
+str_o db '0o'
+
+
 num_buf times 64 db 0
 
 h db "1 %s", 0
